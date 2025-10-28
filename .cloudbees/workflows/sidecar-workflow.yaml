@@ -21,3 +21,14 @@ jobs:
         uses: docker://golang:1.20.3-alpine3.17
         shell: sh
         run: echo "Testing sidecar service"
+      - name: Publish Workflow Evidence Item
+        uses: cloudbees-io/publish-evidence-item@v1
+        with:
+          content: |
+            ## Test Automation Report Details:
+
+            | Report Link | Environment |
+            |-------------|-------------|
+            | [Test Automation Report](https://cb-test-automation.saas-preprod.beescloud.com/hosting-test/${{ cloudbees.run_id }}/html-test-results/index.html) | ${{ steps.codecheck.outputs.output1 }} |
+
+            *(Right-click the link and choose "Open Link in New Tab" if the link doesn’t open in a new tab automatically.)*
