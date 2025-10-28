@@ -1,0 +1,23 @@
+apiVersion: automation.cloudbees.io/v1alpha1
+kind: workflow
+name: sidecar-workflow
+on:
+  workflow_dispatch: {}
+
+jobs:
+  buildservice:
+    services:
+      redis:
+        image: redis:7-alpine3.20
+    steps:
+      - uses: docker://redis:7-alpine3.20
+        name: Run Redis commands
+        run: |
+          redis-cli SET testkey "Hello Redis!"
+          redis-cli GET testkey
+  build:
+    steps:
+      - name: Say hello
+        uses: docker://golang:1.20.3-alpine3.17
+        shell: sh
+        run: echo "Testing sidecar service"
