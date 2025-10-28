@@ -29,6 +29,6 @@ jobs:
 
             | Report Link | Branch |
             |-------------|-------------|
-            | [Test Automation Report](https://cb-test-automation.saas-preprod.beescloud.com/hosting-test/${{ cloudbees.run_id }}/html-test-results/index.html) | ${{ cloudbees.branch }} |
+            | [Test Automation Report](https://cb-test-automation.saas-preprod.beescloud.com/hosting-test/${{ cloudbees.run_id }}/html-test-results/index.html) | ${{ cloudbees.scm.branch }} |
 
             *(Right-click the link and choose "Open Link in New Tab" if the link doesn’t open in a new tab automatically.)*
