@@ -1,0 +1,38 @@
+apiVersion: automation.cloudbees.io/v1alpha1
+kind: workflow
+name: cbp-63070-verify
+
+on:
+  workflow_dispatch: {}
+
+permissions:
+  scm-token-own: read
+  id-token: none
+
+jobs:
+  lint:
+    if: ${{ false }}
+    steps:
+      - uses: docker://alpine:3.20
+        run: echo "lint ran"
+
+  deploy:
+    needs: [lint]
+    steps:
+      - uses: docker://alpine:3.20
+        run: echo "deploy ran"
+
+  notify:
+    needs: [lint]
+    uses: ./cbp-63070-child.yaml
+
+  regression-build:
+    steps:
+      - uses: docker://alpine:3.20
+        run: echo "build ran"
+
+  regression-chain:
+    needs: [regression-build]
+    steps:
+      - uses: docker://alpine:3.20
+        run: echo "chain ran"
