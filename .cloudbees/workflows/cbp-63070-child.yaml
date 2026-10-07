@@ -1,0 +1,16 @@
+apiVersion: automation.cloudbees.io/v1alpha1
+kind: workflow
+name: cbp-63070-child
+
+on:
+  workflow_call: {}
+
+permissions:
+  scm-token-own: read
+  id-token: none
+
+jobs:
+  child-job:
+    steps:
+      - uses: docker://alpine:3.20
+        run: echo "child-job ran"
