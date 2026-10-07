@@ -24,7 +24,7 @@ jobs:
 
   notify:
     needs: [lint]
-    uses: ./cbp-63070-child.yaml
+    uses: rajnish-cloudbees/cloudbees-workflow-testing/.cloudbees/workflows/cbp-63070-child.yaml
 
   regression-build:
     steps:
