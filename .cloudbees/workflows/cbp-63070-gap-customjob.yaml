@@ -6,7 +6,10 @@ handlers:
   init:
     uses: docker://alpine:3.20
     command: /bin/sh
-    args: -c "echo init"
+    env:
+      CALLBACK_URL: ${{ callback.url }}
+      CALLBACK_TOKEN: ${{ callback.token }}
+    args: "-c \"echo '=== COMPLETE CUSTOM JOB: run the curl below ==='; echo \\\"curl -sS -X POST '$CALLBACK_URL' -H 'Authorization: Bearer $CALLBACK_TOKEN' -H 'Content-Type: application/json' -d '{\\\\\\\"payload\\\\\\\":\\\\\\\"ok\\\\\\\"}'\\\"\""
   callback:
     uses: docker://alpine:3.20
     command: /bin/sh
