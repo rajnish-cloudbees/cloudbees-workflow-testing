@@ -1,0 +1,46 @@
+apiVersion: automation.cloudbees.io/v1alpha1
+kind: workflow
+name: cbp-63070-gap-direct
+
+on:
+  workflow_dispatch: {}
+
+permissions:
+  scm-token-own: read
+  id-token: none
+
+jobs:
+  # Always skips.
+  lint:
+    if: ${{ false }}
+    steps:
+      - uses: docker://alpine:3.20
+        run: echo "lint should be skipped"
+
+  # Control: a regular job that directly needs the skipped lint. With CBP-63070 this
+  # SKIPS. Compare its behavior against the custom/edge jobs below.
+  deploy:
+    needs: [lint]
+    steps:
+      - uses: docker://alpine:3.20
+        run: echo "deploy should be skipped (regular job)"
+
+  # Top-level CUSTOM (delegates:) job directly needing the skipped lint. Does its skip
+  # propagate? Custom jobs emit --needs= but no --needs-skip and have no When gate.
+  direct-custom:
+    needs: [lint]
+    delegates: rajnish-cloudbees/cloudbees-workflow-testing/.cloudbees/workflows/cbp-63070-gap-customjob.yaml
+
+  # Top-level EDGE (runs-on: [self-hosted]) job directly needing the skipped lint.
+  direct-edge:
+    needs: [lint]
+    runs-on: [self-hosted, os:linux]
+    steps:
+      - uses: docker://alpine:3.20
+        run: echo "direct-edge should be skipped"
+
+  # Control chain that must run green, proving the trigger itself works.
+  regression-build:
+    steps:
+      - uses: docker://alpine:3.20
+        run: echo "regression-build ran"
