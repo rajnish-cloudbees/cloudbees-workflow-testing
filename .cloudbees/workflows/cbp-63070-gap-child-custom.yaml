@@ -1,0 +1,17 @@
+apiVersion: automation.cloudbees.io/v1alpha1
+kind: workflow
+name: cbp-63070-gap-child-custom
+
+on:
+  workflow_call: {}
+
+permissions:
+  scm-token-own: read
+  id-token: none
+
+jobs:
+  # A custom (delegates:) job nested in a reusable workflow. When the parent call's
+  # init job is skipped, this job still requests __wf_context with no --needs-skip
+  # wiring — the gap under test.
+  custom-child:
+    delegates: rajnish-cloudbees/cloudbees-workflow-testing/.cloudbees/workflows/cbp-63070-gap-customjob.yaml

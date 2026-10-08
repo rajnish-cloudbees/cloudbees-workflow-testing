@@ -1,0 +1,17 @@
+apiVersion: automation.cloudbees.io/v1alpha1
+kind: CustomJob
+name: cbp-63070-gap-customjob
+description: Minimal custom job to reproduce the skip-crash gap
+handlers:
+  init:
+    uses: docker://alpine:3.20
+    command: /bin/sh
+    args: -c "echo init"
+  callback:
+    uses: docker://alpine:3.20
+    command: /bin/sh
+    args: -c "echo ${{ handler.payload }}"
+  cancel:
+    uses: docker://alpine:3.20
+    command: /bin/sh
+    args: -c "echo cancel"

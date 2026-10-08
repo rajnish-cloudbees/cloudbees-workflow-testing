@@ -1,0 +1,42 @@
+apiVersion: automation.cloudbees.io/v1alpha1
+kind: workflow
+name: cbp-63070-gap-verify
+
+on:
+  workflow_dispatch: {}
+
+permissions:
+  scm-token-own: read
+  id-token: none
+
+jobs:
+  # Always skips. Its skip propagates to any job that needs it.
+  lint:
+    if: ${{ false }}
+    steps:
+      - uses: docker://alpine:3.20
+        run: echo "lint should be skipped"
+
+  # Reusable call whose INIT job skips (needs the skipped lint job). The reusable
+  # workflow contains a CUSTOM (delegates:) job — the gap case under test.
+  call-custom:
+    needs: [lint]
+    uses: rajnish-cloudbees/cloudbees-workflow-testing/.cloudbees/workflows/cbp-63070-gap-child-custom.yaml
+
+  # Reusable call whose INIT job skips. The reusable workflow contains an EDGE
+  # (runs-on: [self-hosted]) job — the second gap case.
+  call-edge:
+    needs: [lint]
+    uses: rajnish-cloudbees/cloudbees-workflow-testing/.cloudbees/workflows/cbp-63070-gap-child-edge.yaml
+
+  # Control: a normal chain that must still run green, proving the trigger works.
+  regression-build:
+    steps:
+      - uses: docker://alpine:3.20
+        run: echo "regression-build ran"
+
+  regression-chain:
+    needs: [regression-build]
+    steps:
+      - uses: docker://alpine:3.20
+        run: echo "regression-chain ran"
