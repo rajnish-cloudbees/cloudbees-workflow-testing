@@ -1,0 +1,111 @@
+apiVersion: automation.cloudbees.io/v1alpha1
+kind: workflow
+name: cbp-63070-matrix
+
+# Live counterpart of the skip-gate-matrix transform test. Exercises custom (delegates:) and
+# edge (runs-on: self-hosted) jobs across the gate matrix: standalone / if: / needs: / needed-by.
+# Two things to observe:
+#   1. Regression: standalone custom/edge jobs (no if:, no needs:, not needed-by) must still START
+#      normally — they must NOT be over-gated into a skip.
+#   2. Skip propagation: a custom/edge job whose if: is false, or that needs: a skipped job, must
+#      SKIP — and its Pod must never be scheduled (no __wf_context crash).
+
+on:
+  workflow_dispatch: {}
+
+permissions:
+  scm-token-own: read
+  id-token: none
+
+jobs:
+  # --- anchors ---
+
+  # Runs green. The *-needs-ok jobs depend on this to show a satisfied needs: still runs.
+  regular-anchor:
+    steps:
+      - uses: docker://alpine:3.20
+        run: echo "regular-anchor ran"
+
+  # Always skips. The *-needs-skip jobs depend on this to show skip propagation.
+  always-skip:
+    if: ${{ false }}
+    steps:
+      - uses: docker://alpine:3.20
+        run: echo "always-skip should be SKIPPED"
+
+  # --- custom (delegates:) jobs across the matrix ---
+
+  # standalone: no if:, no needs:, not needed by any job -> must RUN (regression).
+  custom-standalone:
+    delegates: rajnish-cloudbees/cloudbees-workflow-testing/.cloudbees/workflows/cbp-63070-gap-customjob.yaml
+
+  # if: false -> must SKIP by its own condition.
+  custom-if-skip:
+    if: ${{ false }}
+    delegates: rajnish-cloudbees/cloudbees-workflow-testing/.cloudbees/workflows/cbp-63070-gap-customjob.yaml
+
+  # needs: a RUNNING job -> must RUN.
+  custom-needs-ok:
+    needs: [regular-anchor]
+    delegates: rajnish-cloudbees/cloudbees-workflow-testing/.cloudbees/workflows/cbp-63070-gap-customjob.yaml
+
+  # needs: a SKIPPED job -> must SKIP (propagation; Pod never scheduled).
+  custom-needs-skip:
+    needs: [always-skip]
+    delegates: rajnish-cloudbees/cloudbees-workflow-testing/.cloudbees/workflows/cbp-63070-gap-customjob.yaml
+
+  # needed by another job -> gets a pre task even with no if:/needs: of its own. Must RUN.
+  custom-needed-by:
+    delegates: rajnish-cloudbees/cloudbees-workflow-testing/.cloudbees/workflows/cbp-63070-gap-customjob.yaml
+
+  custom-dependent:
+    needs: [custom-needed-by]
+    steps:
+      - uses: docker://alpine:3.20
+        run: echo "custom-dependent ran"
+
+  # --- edge (runs-on: self-hosted) jobs across the matrix ---
+
+  # standalone -> must RUN (regression).
+  edge-standalone:
+    runs-on: [self-hosted, os:linux]
+    steps:
+      - uses: docker://alpine:3.20
+        run: echo "edge-standalone ran"
+
+  # if: false -> must SKIP by its own condition.
+  edge-if-skip:
+    if: ${{ false }}
+    runs-on: [self-hosted, os:linux]
+    steps:
+      - uses: docker://alpine:3.20
+        run: echo "edge-if-skip should be SKIPPED"
+
+  # needs: a RUNNING job -> must RUN.
+  edge-needs-ok:
+    needs: [regular-anchor]
+    runs-on: [self-hosted, os:linux]
+    steps:
+      - uses: docker://alpine:3.20
+        run: echo "edge-needs-ok ran"
+
+  # needs: a SKIPPED job -> must SKIP (propagation; Pod never scheduled).
+  edge-needs-skip:
+    needs: [always-skip]
+    runs-on: [self-hosted, os:linux]
+    steps:
+      - uses: docker://alpine:3.20
+        run: echo "edge-needs-skip should be SKIPPED"
+
+  # needed by another job -> gets a pre task even with no if:/needs: of its own. Must RUN.
+  edge-needed-by:
+    runs-on: [self-hosted, os:linux]
+    steps:
+      - uses: docker://alpine:3.20
+        run: echo "edge-needed-by ran"
+
+  edge-dependent:
+    needs: [edge-needed-by]
+    steps:
+      - uses: docker://alpine:3.20
+        run: echo "edge-dependent ran"
