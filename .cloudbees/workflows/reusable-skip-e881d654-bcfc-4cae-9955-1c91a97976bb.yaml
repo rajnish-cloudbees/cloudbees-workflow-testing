@@ -1,0 +1,20 @@
+apiVersion: automation.cloudbees.io/v1alpha1
+kind: workflow
+name: Reusable Skip Workflow
+on:
+  workflow_dispatch:
+jobs:
+  always-skip:
+    if: ${{ false }}
+    steps:
+      - uses: docker://golang:1.20.3-alpine3.17
+        shell: sh
+        run: echo "always-skip should be skipped"
+  call-reusable:
+    needs: [always-skip]
+    uses: rajnish-cloudbees/cloudbees-workflow-testing/.cloudbees/workflows/callable-skip-6945bb59-b62a-4eb9-b5cf-02ecf880ce51.yaml
+  run-anchor:
+    steps:
+      - uses: docker://golang:1.20.3-alpine3.17
+        shell: sh
+        run: echo "run-anchor should run"
