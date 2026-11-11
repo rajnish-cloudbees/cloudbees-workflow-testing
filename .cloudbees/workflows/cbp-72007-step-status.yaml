@@ -1,0 +1,129 @@
+apiVersion: automation.cloudbees.io/v1alpha1
+kind: workflow
+name: cbp-72007-step-status
+
+# Live verification for CBP-72007 (step misreported as SUCCEEDED when its termination message
+# overflows). Covers both PRs:
+#   - cloudbees-automation-controller#552: a step whose termination message won't parse must report
+#     Errored, not Successful.
+#   - dsl-engine-cli#982: a needed job still declares the skip result (so its steps still carry the
+#     extra bytes that overflow) - this is the case #552 has to catch.
+#
+# The overflow is driven by step COUNT: each step's termination message carries the job's skip
+# result plus (on a non-zero-exit step) an ExitCode, and the per-pod termination-message budget is
+# shared across steps. A job with many steps where an early one fails - so the rest are skipped and
+# each still writes an exit code - is the case that overflows.
+#
+# What to look for in the run-detail graph, per job (see TEST-PLAN.md for the before/after):
+#   overflow-fail: step 1 FAILED (red), steps 2..N SKIPPED - NOT green.
+#   small-fail:    step 1 FAILED - a short message does not overflow, so this must stay FAILED
+#                  (guard must not over-flip a genuine failure's exit code to errored).
+#   all-pass:      every step SUCCEEDED - a clean exit leaves an empty/parseable message, so the
+#                  guard must not touch it.
+
+on:
+  workflow_dispatch: {}
+
+permissions:
+  scm-token-own: read
+  id-token: none
+
+jobs:
+  # overflow-fail is needed by overflow-dependent, so dsl-engine-cli#982 still makes it declare a
+  # skip result - its steps carry the extra bytes. Many steps + an early failure (rest skipped,
+  # each writing an exit code) is the termination-message overflow case. Before #552 the failed
+  # and skipped steps show green; after, they show failed/errored.
+  overflow-fail:
+    steps:
+      - name: s01-fails
+        uses: docker://alpine:3.20
+        run: |
+          echo "s01: failing on purpose"
+          exit 1
+      - name: s02
+        uses: docker://alpine:3.20
+        run: echo "s02 should be SKIPPED (prior step failed)"
+      - name: s03
+        uses: docker://alpine:3.20
+        run: echo "s03 should be SKIPPED"
+      - name: s04
+        uses: docker://alpine:3.20
+        run: echo "s04 should be SKIPPED"
+      - name: s05
+        uses: docker://alpine:3.20
+        run: echo "s05 should be SKIPPED"
+      - name: s06
+        uses: docker://alpine:3.20
+        run: echo "s06 should be SKIPPED"
+      - name: s07
+        uses: docker://alpine:3.20
+        run: echo "s07 should be SKIPPED"
+      - name: s08
+        uses: docker://alpine:3.20
+        run: echo "s08 should be SKIPPED"
+      - name: s09
+        uses: docker://alpine:3.20
+        run: echo "s09 should be SKIPPED"
+      - name: s10
+        uses: docker://alpine:3.20
+        run: echo "s10 should be SKIPPED"
+      - name: s11
+        uses: docker://alpine:3.20
+        run: echo "s11 should be SKIPPED"
+      - name: s12
+        uses: docker://alpine:3.20
+        run: echo "s12 should be SKIPPED"
+      - name: s13
+        uses: docker://alpine:3.20
+        run: echo "s13 should be SKIPPED"
+      - name: s14
+        uses: docker://alpine:3.20
+        run: echo "s14 should be SKIPPED"
+      - name: s15
+        uses: docker://alpine:3.20
+        run: echo "s15 should be SKIPPED"
+      - name: s16
+        uses: docker://alpine:3.20
+        run: echo "s16 should be SKIPPED"
+      - name: s17
+        uses: docker://alpine:3.20
+        run: echo "s17 should be SKIPPED"
+      - name: s18
+        uses: docker://alpine:3.20
+        run: echo "s18 should be SKIPPED"
+      - name: s19
+        uses: docker://alpine:3.20
+        run: echo "s19 should be SKIPPED"
+      - name: s20
+        uses: docker://alpine:3.20
+        run: echo "s20 should be SKIPPED"
+
+  # Depends on overflow-fail, which forces overflow-fail to declare its skip result (the needed-by
+  # case dsl-engine-cli#982 keeps). overflow-fail failed, so this skips via the skip cascade.
+  overflow-dependent:
+    needs: [overflow-fail]
+    steps:
+      - uses: docker://alpine:3.20
+        run: echo "overflow-dependent should be SKIPPED (its need failed)"
+
+  # Control: a genuine failure with a SHORT termination message (few steps, so no overflow). Its
+  # exit code parses fine, so it must stay FAILED - the #552 guard must not flip a real failure to
+  # errored just because the step didn't exit 0.
+  small-fail:
+    steps:
+      - name: only-step-fails
+        uses: docker://alpine:3.20
+        run: |
+          echo "small-fail: failing on purpose"
+          exit 1
+
+  # Control: every step exits clean (empty/parseable termination message). Must stay SUCCESSFUL -
+  # the guard must not touch a genuine success.
+  all-pass:
+    steps:
+      - uses: docker://alpine:3.20
+        run: echo "p1 ran"
+      - uses: docker://alpine:3.20
+        run: echo "p2 ran"
+      - uses: docker://alpine:3.20
+        run: echo "p3 ran"

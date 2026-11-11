@@ -1,0 +1,90 @@
+apiVersion: automation.cloudbees.io/v1alpha1
+kind: workflow
+name: cbp-72007-skip-result-scope
+
+# Live verification for dsl-engine-cli#982 (declare the skip Tekton result only on jobs a
+# dependent reads). The change is structural, so the primary check is on the generated Tekton
+# Tasks, not just the run graph. After triggering, inspect the job Tasks:
+#
+#   kubectl get task -n <run-ns> -o yaml | less
+#
+# Expected .spec.results per job (see TEST-PLAN.md for exact kubectl):
+#   if-only-no-dep   -> NO skip result   (has if:, but nothing reads it -> #982 drops it)
+#   needs-only-no-dep-> NO skip result   (has needs:, but nothing reads it)
+#   anchor           -> declares skip    (needed by dependent -> result is read)
+#   needed-by-only   -> declares skip    (needed by dependent, no if:/needs: of its own)
+#   standalone       -> NO skip result   (unchanged baseline)
+#
+# AND behavior must be unchanged - skip still cascades correctly in the run graph:
+#   if-only-no-dep   -> SKIPPED (its own if: false; still skips without declaring a result)
+#   dependent-of-skip-> SKIPPED (cascades from the skipped anchor it needs)
+#   dependent-of-ok  -> RUNS    (its anchor ran)
+
+on:
+  workflow_dispatch: {}
+
+permissions:
+  scm-token-own: read
+  id-token: none
+
+jobs:
+  # if: only, nothing depends on it. #982: declares NO skip result, but must still SKIP itself.
+  if-only-no-dep:
+    if: ${{ false }}
+    steps:
+      - uses: docker://alpine:3.20
+        run: echo "if-only-no-dep should be SKIPPED, and its Task should declare no skip result"
+
+  # needs: only, nothing depends on it. #982: declares NO skip result. Needs a running anchor so
+  # it runs (proves needs: alone no longer forces a result).
+  needs-only-no-dep:
+    needs: [anchor-ok]
+    steps:
+      - uses: docker://alpine:3.20
+        run: echo "needs-only-no-dep ran; its Task should declare no skip result"
+
+  # A running anchor that IS needed by dependent-of-ok -> must declare a skip result (read by the
+  # dependent's When) and run green.
+  anchor-ok:
+    steps:
+      - uses: docker://alpine:3.20
+        run: echo "anchor-ok ran; its Task should declare a skip result (it is needed)"
+
+  dependent-of-ok:
+    needs: [anchor-ok]
+    steps:
+      - uses: docker://alpine:3.20
+        run: echo "dependent-of-ok ran (its need ran)"
+
+  # A skipping anchor that IS needed by dependent-of-skip -> must declare a skip result so the
+  # cascade works, and the dependent must SKIP.
+  anchor-skip:
+    if: ${{ false }}
+    steps:
+      - uses: docker://alpine:3.20
+        run: echo "anchor-skip should be SKIPPED; its Task should declare a skip result (it is needed)"
+
+  dependent-of-skip:
+    needs: [anchor-skip]
+    steps:
+      - uses: docker://alpine:3.20
+        run: echo "dependent-of-skip should be SKIPPED (cascades from anchor-skip)"
+
+  # needed-by only: no if:/needs: of its own, but a dependent reads it -> must declare a skip
+  # result and run.
+  needed-by-only:
+    steps:
+      - uses: docker://alpine:3.20
+        run: echo "needed-by-only ran; its Task should declare a skip result (it is needed)"
+
+  dependent-of-needed-by:
+    needs: [needed-by-only]
+    steps:
+      - uses: docker://alpine:3.20
+        run: echo "dependent-of-needed-by ran"
+
+  # Baseline: standalone, no if:/needs:, not needed -> declares NO skip result, runs green.
+  standalone:
+    steps:
+      - uses: docker://alpine:3.20
+        run: echo "standalone ran; its Task should declare no skip result"

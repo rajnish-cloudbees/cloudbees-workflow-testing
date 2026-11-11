@@ -1,0 +1,46 @@
+apiVersion: automation.cloudbees.io/v1alpha1
+kind: workflow
+name: cbp-71978-skip-scm-status
+
+# Live verification for scm-providers#105 (a skipped job must report a terminal SCM commit status,
+# not a perpetual pending/INPROGRESS). This is only observable on an SCM-connected run that posts
+# commit statuses, so it triggers on pull_request - a workflow_dispatch run posts no commit status
+# and cannot exercise this.
+#
+# What to look for on the PR that triggers this run (GitHub Checks / commit statuses):
+#   CloudBees/<workflow>/skipped-job  -> a TERMINAL state (success), NOT stuck "pending".
+#   CloudBees/<workflow>/ran-job      -> success (control: a normal job still reports correctly).
+#
+# Before #105: skipped-job's check sits "pending" forever and blocks a required-check merge.
+# After #105 (and once scm-service bumps its scm-providers dep): it resolves to success.
+#
+# NOTE: requires scm-service to be running the scm-providers build that contains #105 (go.mod bump).
+# Until that bump lands, local scm-service still maps SKIPPED to pending - see TEST-PLAN.md.
+
+on:
+  pull_request: {}
+
+permissions:
+  scm-token-own: read
+  id-token: none
+
+jobs:
+  # Skips by its own if:. Its SCM commit status must resolve to a terminal state, not hang pending.
+  skipped-job:
+    if: ${{ false }}
+    steps:
+      - uses: docker://alpine:3.20
+        run: echo "skipped-job should be SKIPPED and report a terminal SCM status"
+
+  # Skips by cascade (needs a skipped job). Second skip path to confirm the status still resolves.
+  skipped-by-needs:
+    needs: [skipped-job]
+    steps:
+      - uses: docker://alpine:3.20
+        run: echo "skipped-by-needs should be SKIPPED (cascade) and report a terminal SCM status"
+
+  # Control: a normal job that runs green - its commit status must still report success.
+  ran-job:
+    steps:
+      - uses: docker://alpine:3.20
+        run: echo "ran-job ran; its SCM status should be success"
