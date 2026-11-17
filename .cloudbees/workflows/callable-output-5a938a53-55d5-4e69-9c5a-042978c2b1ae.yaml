@@ -1,0 +1,17 @@
+apiVersion: automation.cloudbees.io/v1alpha1
+kind: workflow
+name: Callable Workflow With Output
+on:
+  workflow_call:
+    outputs:
+      verdict:
+        value: ${{ jobs.produce.outputs.verdict }}
+jobs:
+  produce:
+    steps:
+      - id: produce
+        uses: docker://golang:1.20.3-alpine3.17
+        shell: sh
+        run: echo -n "child-ok" > $CLOUDBEES_OUTPUTS/verdict
+    outputs:
+      verdict: ${{ steps.produce.outputs.verdict }}
